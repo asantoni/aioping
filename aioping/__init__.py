@@ -233,9 +233,14 @@ class Ping(object):
         self.sourceIntf = sourceIntf
 
         if loop is None:
-            loop = asyncio.get_event_loop()
-        self.loop = loop
+            self.loop = asyncio.get_event_loop()
+        else:
+            self.loop = loop
 
+        if sys.version_info <= (3, 8):
+            self.asyncio_kwargs = {'loop': self.loop}
+        else:
+            self.asyncio_kwargs = {}
         self.socket = None
 
     def close(self):
@@ -254,7 +259,7 @@ class Ping(object):
 
         self.seqNumber = 0
         self.startTime = default_timer()
-        self.queue = asyncio.Queue(loop=self.loop)
+        self.queue = asyncio.Queue(**self.asyncio_kwargs)
 
         global _next_id
         self.ID = _next_id
@@ -325,7 +330,7 @@ class Ping(object):
             timeout = self.timeout
 
         if timeout is not None:
-            recv = asyncio.wait_for(recv, timeout, loop=self.loop)
+            recv = asyncio.wait_for(recv, timeout, **self.asyncio_kwargs)
 
         recv = await recv
         if isinstance(recv,Exception):
@@ -370,7 +375,7 @@ class Ping(object):
                 recv = self.queue.get()
                 if delay1 is not None:
                     recv = asyncio.wait_for(recv, delay1,
-                        loop=self.loop)
+                        **self.asyncio_kwargs)
                 recv = await recv
                 if isinstance(recv,Exception): # error
                     raise recv
@@ -552,7 +557,7 @@ async def ping(dest_addr, timeout=10, **kw):
     await ping.init()
     res = ping.single()
     if timeout:
-        res = asyncio.wait_for(res, timeout, loop=ping.loop)
+        res = asyncio.wait_for(res, timeout, **ping.asyncio_kwargs)
     res = await res
     ping.close()
     return res
